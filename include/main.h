@@ -4,8 +4,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Wire.h>
-#define WIFI_SSID "Thingscontrol"
-#define WIFI_PASS "Th1ng5c0ntr0l"
+#define WIFI_SSID "cleanlight"
+#define WIFI_PASS "2025$panel$"
 
 /* ========================== DEFINITIONS ==========================*/
 enum StateVariables
@@ -42,13 +42,24 @@ enum UpdateFlags
 #define DEBUG_NL(...)
 #endif
 
-/*----------------------    FOTA    ----------------------*/
+/*----------------------    LAN8720A    ----------------------*/
+//#define ETH_PHY_ADDR    1   // Dirección del PHY (generalmente 1)
+#define ETH_POWER_PIN   -1  // Sin pin para controlar la alimentación (si es necesario)
+#define ETH_MDIO_GPIO   18  // Pin para MDIO
+#define ETH_MDC_GPIO    23  // Pin para MDC
+#define ETH_RST_GPIO    -1  // Sin pin de reset, si el módulo no lo necesita
+#define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT  // Usar GPIO0 para generar el reloj de 50 MHz
 
-// #include <otadrive_esp.h>
-// OTAdrive APIkey for this product
-// #define APIKEY "COPY_APIKEY_HERE"
-// // this app version
-// #define FW_VER "v@x.x.x"
+/* ----------------------   RS485    ---------------------- */
+#include <ModbusRTU.h>
+
+#define MODBUS_TX_PIN     32
+#define MODBUS_RX_PIN     35
+#define RS485_BAUD_RATE   9600
+#define REGN              10
+#define SLAVE_ID          1
+#define MODBUS_SERIAL     Serial2
+#define RE_DE_PIN 21
 
 /*----------------------    PZEM-004T    ----------------------*/
 #include <PZEM004Tv30.h>
@@ -68,37 +79,15 @@ enum UpdateFlags
 #define DHTPIN 33 
 #define DHTTYPE DHT22
 
-/*----------------------    ANALOG INPUTS    ----------------------*/
-#define INA1    36
-#define INA2    39
-#define INA3    34
-#define INA4    35
-
-/*----------------------    VIBRACION    ----------------------*/
-#define MMS_MIN         0
-#define MMS_MAX         11
-#define VOLTAGE_MIN     660
-#define VOLTAGE_MAX     4095
-
 /*----------------------    RELAYS    ----------------------*/
-#include "PCF8574.h"
-#define RELAY_ADDRESS   0x24
-#define SDAPIN          4
-#define SCLPIN          15
-#define RELAY_01        P0
-#define RELAY_02        P1
-#define RELAY_03        P2
-#define RELAY_04        P3
-#define RELAY_05        P4
-#define RELAY_06        P5
+#define RELAY_01        15
+#define RELAY_02        2
 
-extern PZEM004Tv30 pzem;
-extern PCF8574 pcf8574;
 extern uint32_t updateFlags;
 extern bool sendExpress;
 /*----------------------  THINGSBOARD  ----------------------*/
 #include <ThingsBoard.h>
-#define THINGSBOARD_SERVER      "panel.thingscontrol.cloud"
-#define TOKEN                   "328tLf5KGgckQdnhrlTc" // dispositivo motor-001
+#define THINGSBOARD_SERVER      "iot.cleanlight.cl"
+#define TOKEN                   "lk5XeW1V52ao5rsQzTHb" // dispositivo motor-001
 
 #endif
