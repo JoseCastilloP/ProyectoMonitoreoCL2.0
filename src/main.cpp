@@ -42,6 +42,10 @@ extern uint16_t voltageDc;
 extern uint16_t currentDc;
 extern uint32_t powerDc;
 extern uint32_t energyDc;
+extern uint16_t voltageDc2;
+extern uint16_t currentDc2;
+extern uint32_t powerDc2;
+extern uint32_t energyDc2;
 extern uint16_t voltageA;
 extern uint16_t frequency;
 extern uint16_t powerA;
@@ -199,15 +203,26 @@ void sendData(void)
   }
 
   memset(payload_str, 0, sizeof(payload_str));
-  sprintf(payload_str, "{\"Energy\":%d,\"Fp\":%d,\"Frec\":%d,\"Humidity\":90,\"POWER\":%d,\"VAC\":%d,\"VBat1\":%d,\"VPanel1\":%d}",
+  sprintf(payload_str, "{\"VBat1\":%d,\"VPanel1\":%d,\"IBat1\":%d,\"IPanel1\":90,\"PBat1\":%d,\"PPanel1\":%d,\"EBat1\":%d,\"EPanel1\":%d}",
+          voltageDc,
+          voltageDc2,
+          currentDc,
+          currentDc2,
+          powerDc,
+          powerDc2,
+          energyDc,
+          energyDc2);
+  tb.sendTelemetryJson(payload_str);
+
+  memset(payload_str, 0, sizeof(payload_str));
+  sprintf(payload_str, "{\"Energy\":%d,\"Fp\":%d,\"Frec\":%d,\"Humidity\":90,\"POWER\":%d,\"VAC\":%d}",
           activeEnergyA,
           PFA,
           frequency,
           powerA,
-          voltageA,
-          voltageDc,
-          voltageDc);
+          voltageA);
   tb.sendTelemetryJson(payload_str);
+
   // if (current > 0)
   // {
   //   tb.sendTelemetryData("conn", conn);
