@@ -3,6 +3,7 @@
 #include <temp-hum.h>
 #include <pzem017.h>
 #include <adl200n-ct.h>
+#include <gps-neo6m.h>
 
 const uint16_t THINGSBOARD_PORT = 80U;
 const uint16_t MAX_MESSAGE_SIZE = 128U;
@@ -33,7 +34,7 @@ const unsigned long attemptInterval = 1000; // 500ms
 int connect_count = 0;
 
 uint32_t cicle_t = 0;
-uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0, to_adl200n = 0;
+uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0, to_adl200n = 0, to_gps = 0;
 const uint32_t TIME_LOOPS = 100;
 uint32_t updateFlags = 0;
 uint64_t conn = 0, dcon = 0;
@@ -54,6 +55,9 @@ extern float currentA;
 extern float PFA;
 extern double activeEnergyA;
 
+extern float latitud;
+extern float longitud;
+
 void printData(void);
 void analogILoop(void);
 float mapValue(float input, float in_min, float in_max, float out_min, float out_max);
@@ -65,8 +69,36 @@ void systemTick(void);
 void mms_update(void);
 void update_all_data(void);
 
+RPC_Response setRelay1(const RPC_Data &data)
+{
+  bool state = data;  // true o false
+  digitalWrite(RELAY_01, state ? LOW : HIGH); // activo en LOW
+  Serial.print("Relay1 -> ");
+  Serial.println(state ? "ON" : "OFF");
+  tb.sendAttributeBool("setRelay1", state);
+  return RPC_Response("relay1", state);
+}
+
+RPC_Response setRelay2(const RPC_Data &data)
+{
+  bool state = data;
+  digitalWrite(RELAY_02, state ? LOW : HIGH);
+  Serial.print("Relay2 -> ");
+  Serial.println(state ? "ON" : "OFF");
+  tb.sendAttributeBool("setRelay2", state);
+  return RPC_Response("relay2", state);
+}
+
+// Lista de métodos RPC que acepta el ESP32
+RPC_Callback callbacks[] = {
+  { "setRelay1", setRelay1 },
+  { "setRelay2", setRelay2 }
+};
+
+
 void setup()
 {
+  GPS_SERIAL.begin(SERIAL_BAUD_GPS, SERIAL_8N1, GPS_TX_SERIAL_RX, GPS_RX_SERIAL_TX, false, 20000, 112);
   SERIAL_MON.begin(SERIAL_BAUD);
   DEBUG_NL("[setup] Initializing device");
 
@@ -76,6 +108,11 @@ void setup()
   Serial485.begin(RS485_BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
   mb.begin(&Serial485);
   mb.master();
+
+  pinMode(RELAY_01, OUTPUT);
+  pinMode(RELAY_02, OUTPUT);
+  digitalWrite(RELAY_01, LOW);
+  digitalWrite(RELAY_02, LOW);
 
   handleWiFiConnection();
   // Uncomment in order to reset the internal energy counter
@@ -98,6 +135,13 @@ void loop()
   if (to_adl200n >= 10)
   {
     adl200nCtLoop();
+    to_adl200n = 0;
+  }
+
+  if(to_gps >= 5)
+  {
+    gpsdata();
+    to_gps = 0;
   }
 
 
@@ -157,14 +201,17 @@ void printData(void)
 {
   char aux[255];
   memset(aux, 0, sizeof(aux));
-  sprintf(aux, "[printData] temp: %.2f hum: %.2f", temperature, humidity);
+  sprintf(aux, "[GHT-22] temp: %.2f hum: %.2f", temperature, humidity);
   DEBUG_NL(aux);
   memset(aux, 0, sizeof(aux));
-  // sprintf(aux, "[PZEM] vac: %.2f cac: %.2f pow: %.2f ene: %.2f fre: %.2f pf: %.2f",voltage, current, power, energy, frequency, pf);
+  sprintf(aux, "[ADL200N] vac: %.2f cac: %.2f pow: %.2f ene: %.2f fre: %.2f pf: %.2f",voltageA, currentA, powerA, activeEnergyA, frequency, PFA);
+  DEBUG_NL(aux);
+
+  memset(aux, 0, sizeof(aux));
+  sprintf(aux, "[GPS-NEO6M] Latitud: %f Longitud: %f",longitud, latitud);
   DEBUG_NL(aux);
 
   DHTSensor(&dht);
-  analogILoop();
 }
 
 String generateString(int length)
@@ -204,6 +251,11 @@ void sendData(void)
     {
       DEBUG_NL("Failed to connect");
       return;
+    }
+    else
+    {
+      DEBUG_NL("connect!!!");
+      tb.RPC_Subscribe(callbacks, sizeof(callbacks) / sizeof(callbacks[0]));
     }
   }
 

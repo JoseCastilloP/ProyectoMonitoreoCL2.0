@@ -12,6 +12,7 @@ enum StateVariables
 {
   DHT22_ONE_DETECTED = BIT0,
   GPS_DATA_VALID = BIT1,
+
 };
 
 enum WiFiState
@@ -85,6 +86,13 @@ enum UpdateFlags
 
 extern uint32_t updateFlags;
 extern bool sendExpress;
+
+/*----------------------    GPS    ----------------------*/
+#define GPS_TX_SERIAL_RX 4
+#define GPS_RX_SERIAL_TX 16
+#define SERIAL_BAUD_GPS 9600
+#define GPS_SERIAL Serial1
+
 /*----------------------  THINGSBOARD  ----------------------*/
 #include <ThingsBoard.h>
 #define THINGSBOARD_SERVER      "iot.cleanlight.cl"
