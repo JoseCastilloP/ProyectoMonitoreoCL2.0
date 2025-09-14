@@ -3,6 +3,7 @@
 /*----------------------    COMUNES    ----------------------*/
 #include <Arduino.h>
 #include <WiFi.h>
+//#include <WiFiClientSecure.h> 
 #include <Wire.h>
 #define WIFI_SSID "cleanlight1234"
 #define WIFI_PASS "12345678"

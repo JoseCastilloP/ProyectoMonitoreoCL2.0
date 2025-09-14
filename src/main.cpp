@@ -76,7 +76,7 @@ const char* FW_USER = "adminCL";     // usuario válido
 const char* FW_PASS = "Ysxn3Nui6kF1";      // contraseña válida
 
 // -------------------- URL de firmware en GitHub --------------------
-const char* FW_URL = "https://raw.githubusercontent.com/USUARIO/REPO/main/firmware.bin";
+const char* FW_URL = "https://github.com/JoseCastilloP/ProyectoMonitoreoCL2.0/raw/refs/heads/main/output/firmware.bin";
 
 RPC_Response onUpdateRPC(const RPC_Data &data)
 {
@@ -92,20 +92,21 @@ RPC_Response onUpdateRPC(const RPC_Data &data)
   {
     tb.sendTelemetryString("fwUpdate", "Starting OTA...");
 
-    t_httpUpdate_return ret = ESPhttpUpdate.update(FW_URL);
-    switch (ret)
-    {
-      case HTTP_UPDATE_OK:
-        // Si llega aquí, el ESP se reinicia automáticamente después del update
-        tb.sendTelemetryString("fwUpdate", "Update OK, rebooting...");
-        break;
-      case HTTP_UPDATE_FAILED:
-        tb.sendTelemetryString("fwUpdate", "Update Failed");
-        break;
-      case HTTP_UPDATE_NO_UPDATES:
-        tb.sendTelemetryString("fwUpdate", "No Update Available");
-        break;
-    }
+    // espClient.setInsecure();
+    // t_httpUpdate_return ret = ESPhttpUpdate.update(FW_URL);
+    // switch (ret)
+    // {
+    //   case HTTP_UPDATE_OK:
+    //     // Si llega aquí, el ESP se reinicia automáticamente después del update
+    //     tb.sendTelemetryString("fwUpdate", "Update OK, rebooting...");
+    //     break;
+    //   case HTTP_UPDATE_FAILED:
+    //     tb.sendTelemetryString("fwUpdate", "Update Failed");
+    //     break;
+    //   case HTTP_UPDATE_NO_UPDATES:
+    //     tb.sendTelemetryString("fwUpdate", "No Update Available");
+    //     break;
+    // }
     return RPC_Response("fwUpdate", "OTA triggered");
   }
   else
