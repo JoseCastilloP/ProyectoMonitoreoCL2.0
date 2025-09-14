@@ -33,7 +33,7 @@ const unsigned long attemptInterval = 1000; // 500ms
 int connect_count = 0;
 
 uint32_t cicle_t = 0;
-uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0;
+uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0, to_adl200n = 0;
 const uint32_t TIME_LOOPS = 100;
 uint32_t updateFlags = 0;
 uint64_t conn = 0, dcon = 0;
@@ -46,12 +46,13 @@ extern uint16_t voltageDc2;
 extern uint16_t currentDc2;
 extern uint32_t powerDc2;
 extern uint32_t energyDc2;
-extern uint16_t voltageA;
-extern uint16_t frequency;
-extern uint16_t powerA;
-extern uint16_t currentA;
-extern uint16_t PFA;
-extern uint32_t activeEnergyA;
+
+extern float voltageA;
+extern float frequency;
+extern float powerA;
+extern float currentA;
+extern float PFA;
+extern double activeEnergyA;
 
 void printData(void);
 void analogILoop(void);
@@ -74,9 +75,7 @@ void setup()
 
   Serial485.begin(RS485_BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN, MODBUS_TX_PIN);
   mb.begin(&Serial485);
-  mb.slave(SLAVE_ID);
-  mb.addHreg(REGN);
-  mb.Hreg(REGN, 100);
+  mb.master();
 
   handleWiFiConnection();
   // Uncomment in order to reset the internal energy counter
@@ -95,6 +94,12 @@ void loop()
     modbusProcess();
     to_modbus = 0;
   }
+
+  if (to_adl200n >= 10)
+  {
+    adl200nCtLoop();
+  }
+
 
   handleWiFiConnection();
   // fota_loop();
@@ -119,7 +124,7 @@ void loop()
     to_tb = 0;
   }
 
-  if (to_second >= 10)
+  if (to_second >= 15)
   {
     to_second = 0;
   }
@@ -303,6 +308,7 @@ void systemTick(void)
     to_log++;
     to_second++;
     to_modbus++;
+    to_adl200n++;
     cicle_t = millis();
   }
 }

@@ -4,8 +4,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Wire.h>
-#define WIFI_SSID "cleanlight"
-#define WIFI_PASS "2025$panel$"
+#define WIFI_SSID "cleanlight1234"
+#define WIFI_PASS "12345678"
 
 /* ========================== DEFINITIONS ==========================*/
 enum StateVariables
