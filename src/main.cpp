@@ -4,6 +4,8 @@
 #include <pzem017.h>
 #include <adl200n-ct.h>
 #include <gps-neo6m.h>
+#include <HTTPClient.h>
+#include <ESP32httpUpdate.h>
 
 const uint16_t THINGSBOARD_PORT = 80U;
 const uint16_t MAX_MESSAGE_SIZE = 128U;
@@ -69,6 +71,49 @@ void systemTick(void);
 void mms_update(void);
 void update_all_data(void);
 
+// -------------------- Credenciales OTA --------------------
+const char* FW_USER = "adminCL";     // usuario válido
+const char* FW_PASS = "Ysxn3Nui6kF1";      // contraseña válida
+
+// -------------------- URL de firmware en GitHub --------------------
+const char* FW_URL = "https://raw.githubusercontent.com/USUARIO/REPO/main/firmware.bin";
+
+RPC_Response onUpdateRPC(const RPC_Data &data)
+{
+  const char* user = data["user"];
+  const char* pass = data["pass"];
+
+  if (!user || !pass)
+  {
+    return RPC_Response("fwUpdate", "Missing credentials");
+  }
+
+  if (String(user) == FW_USER && String(pass) == FW_PASS)
+  {
+    tb.sendTelemetryString("fwUpdate", "Starting OTA...");
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(FW_URL);
+    switch (ret)
+    {
+      case HTTP_UPDATE_OK:
+        // Si llega aquí, el ESP se reinicia automáticamente después del update
+        tb.sendTelemetryString("fwUpdate", "Update OK, rebooting...");
+        break;
+      case HTTP_UPDATE_FAILED:
+        tb.sendTelemetryString("fwUpdate", "Update Failed");
+        break;
+      case HTTP_UPDATE_NO_UPDATES:
+        tb.sendTelemetryString("fwUpdate", "No Update Available");
+        break;
+    }
+    return RPC_Response("fwUpdate", "OTA triggered");
+  }
+  else
+  {
+    return RPC_Response("fwUpdate", "Invalid credentials");
+  }
+}
+
 RPC_Response setRelay1(const RPC_Data &data)
 {
   bool state = data;  // true o false
@@ -92,7 +137,8 @@ RPC_Response setRelay2(const RPC_Data &data)
 // Lista de métodos RPC que acepta el ESP32
 RPC_Callback callbacks[] = {
   { "setRelay1", setRelay1 },
-  { "setRelay2", setRelay2 }
+  { "setRelay2", setRelay2 },
+  { "setBin", onUpdateRPC }
 };
 
 
