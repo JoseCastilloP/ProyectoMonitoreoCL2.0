@@ -157,7 +157,7 @@ void printData(void)
 {
   char aux[255];
   memset(aux, 0, sizeof(aux));
-  // sprintf(aux, "[printData] temp: %.2f hum: %.2f ina:%d mms: %.4f", temperature, humidity, analog_input1, mms);
+  sprintf(aux, "[printData] temp: %.2f hum: %.2f", temperature, humidity);
   DEBUG_NL(aux);
   memset(aux, 0, sizeof(aux));
   // sprintf(aux, "[PZEM] vac: %.2f cac: %.2f pow: %.2f ene: %.2f fre: %.2f pf: %.2f",voltage, current, power, energy, frequency, pf);

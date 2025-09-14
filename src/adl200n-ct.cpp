@@ -109,13 +109,13 @@ void adl200nCtLoop(void)
     static uint32_t last = 0;
     if (millis() - last > 30000)
     {
-        last = millis();
-        DEBUG_NL("------ Lectura Modbus ------");
-        DEBUG_NL("Voltaje AC: %.2f", voltageA);
-        DEBUG_NL("Corriente AC: %.2f", currentA);
-        DEBUG_NL("Frecuencia AC: %.2f", frequency);
-        DEBUG_NL("Fact Potencia: %.2f", PFA);
-        DEBUG_NL("Potencia AC: %.2f", powerA);
-        DEBUG_NL("Energia AC: %.2f", activeEnergyA);
+        // last = millis();
+        // DEBUG_NL("------ Lectura Modbus ------");
+        // DEBUG_NL("Voltaje AC: %.2f", voltageA);
+        // DEBUG_NL("Corriente AC: %.2f", currentA);
+        // DEBUG_NL("Frecuencia AC: %.2f", frequency);
+        // DEBUG_NL("Fact Potencia: %.2f", PFA);
+        // DEBUG_NL("Potencia AC: %.2f", powerA);
+        // DEBUG_NL("Energia AC: %.2f", activeEnergyA);
     }
 }
