@@ -5,7 +5,7 @@
 #include <WiFi.h>
 //#include <WiFiClientSecure.h> 
 #include <Wire.h>
-#define WIFI_SSID "cleanlight1234"
+#define WIFI_SSID "Piso 2"
 #define WIFI_PASS "12345678"
 
 /* ========================== DEFINITIONS ==========================*/

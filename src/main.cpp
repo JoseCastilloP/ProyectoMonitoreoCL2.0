@@ -5,14 +5,57 @@
 #include <adl200n-ct.h>
 #include <gps-neo6m.h>
 #include <HTTPClient.h>
-#include <ESP32httpUpdate.h>
 
-const uint16_t THINGSBOARD_PORT = 80U;
-const uint16_t MAX_MESSAGE_SIZE = 128U;
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <Arduino_MQTT_Client.h>
+#include <OTA_Firmware_Update.h>
+#include <Server_Side_RPC.h>
+#include <ThingsBoard.h>
+#include <Espressif_Updater.h>
+
+constexpr char CURRENT_FIRMWARE_TITLE[] = "NODE_CL";
+constexpr char CURRENT_FIRMWARE_VERSION[] = "00.00.01";
+
+// constexpr char TOKEN[] = "y8axwLXM0BPN7saIuLHH";
+// constexpr char THINGSBOARD_SERVER[] = "iot.cleanlight.cl";
+constexpr uint8_t FIRMWARE_FAILURE_RETRIES = 12U;
+constexpr uint16_t FIRMWARE_PACKET_SIZE = 8192U;
+constexpr uint16_t THINGSBOARD_PORT = 1883U;
+constexpr uint16_t MAX_MESSAGE_SEND_SIZE = 512U;
+constexpr uint16_t MAX_MESSAGE_RECEIVE_SIZE = 512U;
+constexpr uint32_t SERIAL_DEBUG_BAUD = 115200U;
 char payload_str[255];
 
+constexpr const char RPC_SWITCH_KEY[] = "switch";
+constexpr const char RPC_RELAY01_METHOD[] = "setRelay1";
+constexpr const char RPC_RELAY02_METHOD[] = "setRelay2";
+constexpr uint8_t MAX_RPC_SUBSCRIPTIONS = 2U;
+constexpr uint8_t MAX_RPC_RESPONSE = 5U;
+
 WiFiClient espClient;
-ThingsBoard tb(espClient);
+Arduino_MQTT_Client mqttClient(espClient);
+// Initialize used apis
+Server_Side_RPC<MAX_RPC_SUBSCRIPTIONS, MAX_RPC_RESPONSE> rpc;
+OTA_Firmware_Update<> ota;
+
+void procesSetRelay1(const JsonVariantConst &data, JsonDocument &response);
+void procesSetRelay2(const JsonVariantConst &data, JsonDocument &response);
+
+const std::array<IAPI_Implementation *, 2U> apis = {
+    &rpc, &ota};
+
+const std::array<RPC_Callback, MAX_RPC_SUBSCRIPTIONS> callbacks = {
+      RPC_Callback{ "setRelay1", procesSetRelay1 },
+      RPC_Callback{ "setRelay2", procesSetRelay2 }
+    };
+// Initialize ThingsBoard instance with the maximum needed buffer size
+ThingsBoard tb(mqttClient, MAX_MESSAGE_RECEIVE_SIZE, MAX_MESSAGE_SEND_SIZE, Default_Max_Stack_Size, apis);
+Espressif_Updater<> updater;
+
+bool currentFWSent = false;
+bool updateRequestSent = false;
+bool subscribed = false;
 
 HardwareSerial Serial485(2);
 ModbusRTU mb;
@@ -70,78 +113,53 @@ void handleWiFiConnection(void);
 void systemTick(void);
 void mms_update(void);
 void update_all_data(void);
+bool relay1 = false, relay2 = false;
 
-// -------------------- Credenciales OTA --------------------
-const char* FW_USER = "adminCL";     // usuario válido
-const char* FW_PASS = "Ysxn3Nui6kF1";      // contraseña válida
-
-// -------------------- URL de firmware en GitHub --------------------
-const char* FW_URL = "https://github.com/JoseCastilloP/ProyectoMonitoreoCL2.0/raw/refs/heads/main/output/firmware.bin";
-
-RPC_Response onUpdateRPC(const RPC_Data &data)
+void update_starting_callback()
 {
-  const char* user = data["user"];
-  const char* pass = data["pass"];
-
-  if (!user || !pass)
-  {
-    return RPC_Response("fwUpdate", "Missing credentials");
-  }
-
-  if (String(user) == FW_USER && String(pass) == FW_PASS)
-  {
-    tb.sendTelemetryString("fwUpdate", "Starting OTA...");
-
-    // espClient.setInsecure();
-    // t_httpUpdate_return ret = ESPhttpUpdate.update(FW_URL);
-    // switch (ret)
-    // {
-    //   case HTTP_UPDATE_OK:
-    //     // Si llega aquí, el ESP se reinicia automáticamente después del update
-    //     tb.sendTelemetryString("fwUpdate", "Update OK, rebooting...");
-    //     break;
-    //   case HTTP_UPDATE_FAILED:
-    //     tb.sendTelemetryString("fwUpdate", "Update Failed");
-    //     break;
-    //   case HTTP_UPDATE_NO_UPDATES:
-    //     tb.sendTelemetryString("fwUpdate", "No Update Available");
-    //     break;
-    // }
-    return RPC_Response("fwUpdate", "OTA triggered");
-  }
-  else
-  {
-    return RPC_Response("fwUpdate", "Invalid credentials");
-  }
+  Serial.println("update_starting_callback()");
 }
 
-RPC_Response setRelay1(const RPC_Data &data)
+void finished_callback(const bool &success)
 {
-  bool state = data;  // true o false
-  digitalWrite(RELAY_01, state ? LOW : HIGH); // activo en LOW
-  Serial.print("Relay1 -> ");
-  Serial.println(state ? "ON" : "OFF");
-  tb.sendAttributeBool("setRelay1", state);
-  return RPC_Response("relay1", state);
+  if (success)
+  {
+    Serial.println("Done, Reboot now");
+    esp_restart();
+    return;
+  }
+  Serial.println("Downloading firmware failed");
 }
 
-RPC_Response setRelay2(const RPC_Data &data)
+void progress_callback(const size_t &current, const size_t &total)
 {
-  bool state = data;
-  digitalWrite(RELAY_02, state ? LOW : HIGH);
-  Serial.print("Relay2 -> ");
-  Serial.println(state ? "ON" : "OFF");
-  tb.sendAttributeBool("setRelay2", state);
-  return RPC_Response("relay2", state);
+  Serial.printf("Progress %.2f%%\n", static_cast<float>(current * 100U) / total);
 }
 
-// Lista de métodos RPC que acepta el ESP32
-RPC_Callback callbacks[] = {
-  { "setRelay1", setRelay1 },
-  { "setRelay2", setRelay2 },
-  { "setBin", onUpdateRPC }
-};
+void procesSetRelay1(const JsonVariantConst &data, JsonDocument &response)
+{
 
+  relay1 = data;
+  digitalWrite(RELAY_01, relay1? LOW : HIGH);
+  DEBUG_NN("Relay1 -> ");
+  DEBUG_NL(relay1 ? "ON" : "OFF");
+  memset(payload_str, 0, sizeof(payload_str));
+  sprintf(payload_str,  "{\"relay1\":%d,\"relay2\":%d}", relay1, relay2);
+  tb.sendTelemetryString(payload_str);
+  response.set(relay1);
+}
+
+void procesSetRelay2(const JsonVariantConst &data, JsonDocument &response)
+{
+  relay2 = data["setRelay2"];
+  digitalWrite(RELAY_02, relay2? LOW : HIGH);
+  DEBUG_NN("Relay2 -> ");
+  DEBUG_NL(relay2 ? "ON" : "OFF");
+  memset(payload_str, 0, sizeof(payload_str));
+  sprintf(payload_str,  "{\"relay1\":%d,\"relay2\":%d}", relay1, relay2);
+  tb.sendTelemetryString(payload_str);
+  response.set(relay2);
+}
 
 void setup()
 {
@@ -185,12 +203,11 @@ void loop()
     to_adl200n = 0;
   }
 
-  if(to_gps >= 5)
+  if (to_gps >= 5)
   {
     gpsdata();
     to_gps = 0;
   }
-
 
   handleWiFiConnection();
   // fota_loop();
@@ -251,11 +268,11 @@ void printData(void)
   sprintf(aux, "[GHT-22] temp: %.2f hum: %.2f", temperature, humidity);
   DEBUG_NL(aux);
   memset(aux, 0, sizeof(aux));
-  sprintf(aux, "[ADL200N] vac: %.2f cac: %.2f pow: %.2f ene: %.2f fre: %.2f pf: %.2f",voltageA, currentA, powerA, activeEnergyA, frequency, PFA);
+  sprintf(aux, "[ADL200N] vac: %.2f cac: %.2f pow: %.2f ene: %.2f fre: %.2f pf: %.2f", voltageA, currentA, powerA, activeEnergyA, frequency, PFA);
   DEBUG_NL(aux);
 
   memset(aux, 0, sizeof(aux));
-  sprintf(aux, "[GPS-NEO6M] Latitud: %f Longitud: %f",longitud, latitud);
+  sprintf(aux, "[GPS-NEO-6M] Latitud: %f Longitud: %f", longitud, latitud);
   DEBUG_NL(aux);
 
   DHTSensor(&dht);
@@ -301,8 +318,30 @@ void sendData(void)
     }
     else
     {
-      DEBUG_NL("connect!!!");
-      tb.RPC_Subscribe(callbacks, sizeof(callbacks) / sizeof(callbacks[0]));
+      if (!currentFWSent)
+      {
+        Serial.println("ota.Firmware_Send_Info");
+        currentFWSent = ota.Firmware_Send_Info(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION);
+      }
+
+      if (!updateRequestSent)
+      {
+        Serial.println("Firwmare Update Subscription...");
+        const OTA_Update_Callback callback(CURRENT_FIRMWARE_TITLE, CURRENT_FIRMWARE_VERSION, &updater, &finished_callback, &progress_callback, &update_starting_callback, FIRMWARE_FAILURE_RETRIES, FIRMWARE_PACKET_SIZE);
+        updateRequestSent = ota.Subscribe_Firmware_Update(callback);
+      }
+
+      if (!subscribed) {
+    Serial.println("Subscribing for RPC...");
+    if (!rpc.RPC_Subscribe(callbacks.cbegin(), callbacks.cend())) {
+      Serial.println("Failed to subscribe for RPC");
+      return;
+    }
+
+    Serial.println("Subscribe done");
+    subscribed = true;
+  }
+
     }
   }
 
@@ -316,7 +355,7 @@ void sendData(void)
           powerDc2,
           energyDc,
           energyDc2);
-  tb.sendTelemetryJson(payload_str);
+  tb.sendTelemetryString(payload_str);
 
   memset(payload_str, 0, sizeof(payload_str));
   sprintf(payload_str, "{\"Energy\":%d,\"Fp\":%d,\"Frec\":%d,\"Humidity\":90,\"POWER\":%d,\"VAC\":%d}",
@@ -325,7 +364,7 @@ void sendData(void)
           frequency,
           powerA,
           voltageA);
-  tb.sendTelemetryJson(payload_str);
+  tb.sendTelemetryString(payload_str);
 
   // if (current > 0)
   // {
