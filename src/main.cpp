@@ -20,7 +20,7 @@ constexpr char CURRENT_FIRMWARE_VERSION[] = "00.00.01";
 // constexpr char TOKEN[] = "y8axwLXM0BPN7saIuLHH";
 // constexpr char THINGSBOARD_SERVER[] = "iot.cleanlight.cl";
 constexpr uint8_t FIRMWARE_FAILURE_RETRIES = 12U;
-constexpr uint16_t FIRMWARE_PACKET_SIZE = 8192U;
+constexpr uint16_t FIRMWARE_PACKET_SIZE = 4096U;
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 constexpr uint16_t MAX_MESSAGE_SEND_SIZE = 512U;
 constexpr uint16_t MAX_MESSAGE_RECEIVE_SIZE = 512U;
@@ -79,7 +79,7 @@ const unsigned long attemptInterval = 1000; // 500ms
 int connect_count = 0;
 
 uint32_t cicle_t = 0;
-uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0, to_adl200n = 0, to_gps = 0;
+uint32_t to_var = 0, to_log = 0, to_tb = 0, to_second, to_modbus = 0, to_adl200n = 0, to_gps = 0, to_pzem017 = 0;
 const uint32_t TIME_LOOPS = 100;
 uint32_t updateFlags = 0;
 uint64_t conn = 0, dcon = 0;
@@ -88,10 +88,19 @@ extern uint16_t voltageDc;
 extern uint16_t currentDc;
 extern uint32_t powerDc;
 extern uint32_t energyDc;
+extern float Vbat1;
+extern float Cbat1;
+extern double Pbat1;
+extern double Ebat1;
+
 extern uint16_t voltageDc2;
 extern uint16_t currentDc2;
 extern uint32_t powerDc2;
 extern uint32_t energyDc2;
+extern float Vpanel1;
+extern float Cpanel1;
+extern double Ppanel1;
+extern double Epanel1;
 
 extern float voltageA;
 extern float frequency;
@@ -180,10 +189,6 @@ void setup()
   digitalWrite(RELAY_02, LOW);
 
   handleWiFiConnection();
-  // Uncomment in order to reset the internal energy counter
-
-  Wire.begin(4, 15, 0);
-  // Set pinMode to OUTPUT
 
   initPzem = true;
   delay(300);
@@ -203,6 +208,12 @@ void loop()
     to_adl200n = 0;
   }
 
+  if (to_pzem017 >= 10)
+  {
+    pzem017Loop();
+    to_pzem017 = 0;
+  }
+
   if (to_gps >= 5)
   {
     gpsdata();
@@ -210,7 +221,6 @@ void loop()
   }
 
   handleWiFiConnection();
-  // fota_loop();
   if (to_var >= 50) // 5000ms
   {
     DHTSensor(&dht);
@@ -272,7 +282,14 @@ void printData(void)
   DEBUG_NL(aux);
 
   memset(aux, 0, sizeof(aux));
-  sprintf(aux, "[GPS-NEO-6M] Latitud: %f Longitud: %f", longitud, latitud);
+  sprintf(aux, "[GPS-NEO-6M] Vbat1: %d Cbat1: %d", longitud, latitud);
+
+  memset(aux, 0, sizeof(aux));
+  sprintf(aux, "[PZEM-017 - 1] VBat1: %.2f CBat1: %f PBat1: %.2f EBat1: %.2f", Vbat1, Cbat1, Pbat1, Ebat1);
+  DEBUG_NL(aux);
+
+  memset(aux, 0, sizeof(aux));
+  sprintf(aux, "[PZEM-017 - 2] VPanel1: %.2f CPanel1: %.2f PPanel1: %.2f EPanel1: %.2f", Vpanel1, Cpanel1, Ppanel1, Epanel1);
   DEBUG_NL(aux);
 
   DHTSensor(&dht);
@@ -346,24 +363,28 @@ void sendData(void)
   }
 
   memset(payload_str, 0, sizeof(payload_str));
-  sprintf(payload_str, "{\"VBat1\":%d,\"VPanel1\":%d,\"IBat1\":%d,\"IPanel1\":90,\"PBat1\":%d,\"PPanel1\":%d,\"EBat1\":%d,\"EPanel1\":%d}",
-          voltageDc,
-          voltageDc2,
-          currentDc,
-          currentDc2,
-          powerDc,
-          powerDc2,
-          energyDc,
-          energyDc2);
+  sprintf(payload_str, "{\"VBat1\":%.2,\"VPanel1\":%.2f,\"IBat1\":%.2f,\"IPanel1\":%.2f,\"PBat1\":%.2f,\"PPanel1\":%.2f,\"EBat1\":%.2f,\"EPanel1\":%.2f}",
+          Vbat1,
+          Vpanel1,
+          Cbat1,
+          Cpanel1,
+          Pbat1,
+          Ppanel1,
+          Ebat1,
+          Epanel1);
   tb.sendTelemetryString(payload_str);
 
   memset(payload_str, 0, sizeof(payload_str));
-  sprintf(payload_str, "{\"Energy\":%d,\"Fp\":%d,\"Frec\":%d,\"Humidity\":90,\"POWER\":%d,\"VAC\":%d}",
+  sprintf(payload_str, "{\"Energy\":%.2,\"Pf\":%.3f,\"Frec\":%.2f,\"POWER\":%d,\"VAC\":%d,\"latitude\":%f,\"longitude\":%f,\"temp\":%f,\"humi\":%f}",
           activeEnergyA,
           PFA,
           frequency,
           powerA,
-          voltageA);
+          voltageA,
+          latitud,
+          longitud,
+          temperature,
+          humidity);
   tb.sendTelemetryString(payload_str);
 
   // if (current > 0)
@@ -447,6 +468,8 @@ void systemTick(void)
     to_second++;
     to_modbus++;
     to_adl200n++;
+    to_gps++;
+    to_pzem017++;
     cicle_t = millis();
   }
 }

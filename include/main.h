@@ -5,7 +5,7 @@
 #include <WiFi.h>
 //#include <WiFiClientSecure.h> 
 #include <Wire.h>
-#define WIFI_SSID "Piso 2"
+#define WIFI_SSID "cleanlight1234"
 #define WIFI_PASS "12345678"
 
 /* ========================== DEFINITIONS ==========================*/
@@ -62,17 +62,6 @@ enum UpdateFlags
 #define SLAVE_ID          1
 #define MODBUS_SERIAL     Serial2
 #define RE_DE_PIN 21
-
-/*----------------------    PZEM-004T    ----------------------*/
-#include <PZEM004Tv30.h>
-#if !defined(PZEM_RX_PIN) && !defined(PZEM_TX_PIN)
-#define PZEM_RX_PIN 13
-#define PZEM_TX_PIN 12
-#endif
-
-#if !defined(PZEM_SERIAL)
-#define PZEM_SERIAL Serial2
-#endif
 
 /*----------------------    DTH22    ----------------------*/
 #include <Adafruit_Sensor.h>

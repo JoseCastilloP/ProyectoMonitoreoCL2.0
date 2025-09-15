@@ -65,6 +65,7 @@ void gpsdata(void)
     $GPRMC,hhmmss.ss,A,llll.ll,a,yyyyy.yy,a,x.x,x.x,ddmmyy,x.x,a\*hh
     $GPRMC,083559.00,A,4717.11437,N,00833.91522,E,0.004,77.52,091202,,,A,V*57
     */
+//    DEBUG_NL("[gpsData]");
     String dataTosend;
     while (GPS_SERIAL.available())
     {
@@ -75,8 +76,7 @@ void gpsdata(void)
         {
             gpsData = GPS_SERIAL.readStringUntil('\n');
             dataTosend = gpsData;
-            // DEBUG_NL("   gpsData \n");
-            // Serial.print(gpsData);
+            // DEBUG_NL("%s", gpsData);
             break;
         }
     }
@@ -90,7 +90,7 @@ void gpsdata(void)
     {
         return;
     }
-    char mensajeChars[100];
+    char mensajeChars[256];
     memset(mensajeChars, 0, sizeof(mensajeChars));
     gpsData.toCharArray(mensajeChars, gpsData.length() + 1);
     char *token = strtok(mensajeChars, ",");
